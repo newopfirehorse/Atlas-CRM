@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Scoring Dashboard</title>
+</head>
+<body>
+    <h1>Property Scoring Dashboard</h1>
+    <form id="propertyForm">
+        <input type="text" name="amenities" placeholder="Amenities (comma-separated)" required>
+        <input type="number" name="guestCapacity" placeholder="Guest Capacity" required>
+        <input type="number" name="bedrooms" placeholder="Bedrooms" required>
+        <input type="number" name="bathrooms" placeholder="Bathrooms" required>
+        <input type="number" name="occupancyRate" placeholder="Occupancy Rate" required>
+        <input type="number" name="averageDailyRate" placeholder="Average Daily Rate" required>
+        <input type="number" name="averageRating" placeholder="Average Rating" required>
+        <input type="number" name="numberOfReviews" placeholder="Number of Reviews" required>
+        <input type="number" name="proximityToAttractions" placeholder="Proximity to Attractions" required>
+        <input type="text" name="uniqueFeatures" placeholder="Unique Features (comma-separated)" required>
+        <button type="submit">Calculate Score</button>
+    </form>
+    <div id="scoreDisplay"></div>
+
+    <script>
+        document.getElementById('propertyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const propertyData = {};
+            for (const [key, value] of formData.entries()) {
+                propertyData[key] = value.includes(',') ? value.split(',') : value;
+            }
+
+            const response = await fetch('http://localhost:3000/calculate-score', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(propertyData)
+            });
+
+            const result = await response.json();
+            document.getElementById('scoreDisplay').innerText = `Score: ${result.totalScore}`;
+        });
+    </script>
+</body>
+</html>
