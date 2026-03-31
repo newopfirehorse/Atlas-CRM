@@ -48,5 +48,5 @@ class H(BaseHTTPRequestHandler):
       return self._send(404, {"error": "not found"})
     
     if __name__ == "__main__":
-    print(f"Starting on http://{HOST}:{PORT}")
-    ThreadingHTTPServer((HOST, PORT), H).serve_forever()
+      print(f"Starting on http://{HOST}:{PORT}")
+      ThreadingHTTPServer((HOST, PORT), H).serve_forever()
