@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atlas CRM + Property Scoring Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    input, select, button { padding: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border-bottom: 1px solid #ddd; padding: 8px; text-align: left; }
+    .muted { color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Atlas CRM + Property Scoring Dashboard</h1>
+  <p class="muted">Set API URL + API key once per browser. Then submit listings and view scorecards.</p>
+
+  <div class="row">
+    <input id="apiBase" type="text" placeholder="API Base URL (https://...onrender.com)" style="min-width: 320px;" />
+    <input id="apiKey" type="password" placeholder="X-API-Key" style="min-width: 260px;" />
+    <button id="saveConfig">Save API Config</button>
+  </div>
+
+  <h3>Add / Score Property</h3>
+  <form id="propertyForm">
+    <div class="row">
+      <input name="address_or_area" placeholder="Address/Area" required />
+      <input name="market" placeholder="Market" required />
+      <input name="list_price" type="number" placeholder="List Price" required />
+      <input name="sqft" type="number" placeholder="Sqft" />
+    </div>
+    <div class="row">
+      <input name="beds" type="number" step="0.5" placeholder="Beds" />
+      <input name="baths" type="number" step="0.5" placeholder="Baths" />
+      <input name="occupancy_rate" type="number" step="0.01" placeholder="Occupancy (0-1)" />
+      <input name="average_daily_rate" type="number" step="0.01" placeholder="ADR" />
+    </div>
+    <div class="row">
+      <input name="distance_to_attraction_miles" type="number" step="0.1" placeholder="Miles to attraction" />
+      <input name="nearest_attraction_name" placeholder="Nearest attraction" />
+      <select name="metro_tier">
+        <option value="">Metro tier</option>
+        <option value="1m+">1M+</option>
+        <option value="500k+">500k+</option>
+        <option value="250k+">250k+</option>
+      </select>
+      <input name="data_confidence" type="number" placeholder="Confidence (0-100)" value="85" />
+    </div>
+    <div class="row">
+      <select name="str_legal_status">
+        <option value="unknown">STR legal status</option>
+        <option value="allowed">allowed</option>
+        <option value="not_allowed">not_allowed</option>
+      </select>
+      <select name="permit_status">
+        <option value="unknown">Permit status</option>
+        <option value="available">available</option>
+        <option value="unavailable">unavailable</option>
+      </select>
+      <input name="amenities" placeholder="Amenities comma-separated" />
+      <button type="submit">Submit to CRM + Score</button>
+    </div>
+  </form>
+
+  <div id="lastResult" class="muted"></div>
+
+  <h3>Scored Properties</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Property</th><th>Market</th><th>Price</th><th>Score</th><th>Label</th><th>Confidence</th><th>Hard Fail</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const cfg = {
+      apiBase: localStorage.getItem('atlasApiBase') || '',
+      apiKey: localStorage.getItem('atlasApiKey') || ''
+    };
+
+    $('apiBase').value = cfg.apiBase;
+    $('apiKey').value = cfg.apiKey;
+
+    $('saveConfig').onclick = () => {
+      localStorage.setItem('atlasApiBase', $('apiBase').value.trim().replace(/\/$/, ''));
+      localStorage.setItem('atlasApiKey', $('apiKey').value.trim());
+      alert('Saved.');
+    };
+
+    async function api(path, opts = {}) {
+      const base = localStorage.getItem('atlasApiBase');
+      const key = localStorage.getItem('atlasApiKey');
+      if (!base) throw new Error('Set API base URL first');
+      const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+      if (key) headers['X-API-Key'] = key;
+      const res = await fetch(base + path, Object.assign({}, opts, { headers }));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      return data;
+    }
+
+    function parseForm(form) {
+      const fd = new FormData(form);
+      const p = {};
+      for (const [k,v] of fd.entries()) p[k] = v;
+      ['list_price','sqft','beds','baths','occupancy_rate','average_daily_rate','distance_to_attraction_miles','data_confidence'].forEach(k => {
+        if (p[k] !== '' && p[k] != null) p[k] = Number(p[k]);
+      });
+      if (p.amenities) p.amenities = p.amenities.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      return p;
+    }
+
+    async function refreshState() {
+      try {
+        const s = await api('/state');
+        const rows = (s.deals || []).map(d => `<tr>
+          <td>${d.id || ''}</td><td>${d.title || ''}</td><td>${d.market || ''}</td>
+          <td>${Number(d.list_price || 0).toLocaleString()}</td><td>${d.score_total ?? ''}</td>
+          <td>${d.score_label || ''}</td><td>${d.data_confidence ?? ''}</td><td>${d.hard_fail_reason || ''}</td>
+        </tr>`).join('');
+        $('rows').innerHTML = rows || '<tr><td colspan="8">No deals</td></tr>';
+      } catch (e) {
+        $('rows').innerHTML = `<tr><td colspan="8">${e.message}</td></tr>`;
+      }
+    }
+
+    $('propertyForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const payload = parseForm(e.target);
+        const out = await api('/deal/enrich', { method: 'POST', body: JSON.stringify(payload) });
+        $('lastResult').textContent = `Saved: ${JSON.stringify(out)}`;
+        await refreshState();
+      } catch (err) {
+        $('lastResult').textContent = `Error: ${err.message}`;
+      }
+    });
+
+    refreshState();
+    setInterval(refreshState, 15000);
+  </script>
+</body>
+</html>
