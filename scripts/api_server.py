@@ -21,31 +21,31 @@ class H(BaseHTTPRequestHandler):
 
   def _authorized(self):
     if not CRM_API_KEY:
-      return True
-      return self.headers.get("X-API-Key", "") == CRM_API_KEY
+    return True
+    return self.headers.get("X-API-Key", "") == CRM_API_KEY
 
   def do_OPTIONS(self):
     self._send(200, {"ok": True})
 
   def do_GET(self):
     if self.path == "/health":
-      return self._send(200, {"ok": True, "service": "atlas-crm-api"})
+    return self._send(200, {"ok": True, "service": "atlas-crm-api"})
     if self.path == "/state":
-      return self._send(200, {"deals": [], "leads": [], "tasks": []})
-      return self._send(404, {"error": "not found"})
+    return self._send(200, {"deals": [], "leads": [], "tasks": []})
+    return self._send(404, {"error": "not found"})
 
   def do_POST(self):
     if not self._authorized():
-      return self._send(401, {"error": "unauthorized"})
+    return self._send(401, {"error": "unauthorized"})
     if self.path == "/deal/enrich":
-      return self._send(200, {
-      "ok": True,
-      "written": True,
-      "id": 1,
-      "score_total": 72.0,
-      "score_label": "WATCH"
-      })
-      return self._send(404, {"error": "not found"})
+    return self._send(200, {
+    "ok": True,
+    "written": True,
+    "id": 1,
+    "score_total": 72.0,
+    "score_label": "WATCH"
+    })
+    return self._send(404, {"error": "not found"})
     
 if __name__ == "__main__":
   print(f"Starting on http://{HOST}:{PORT}")
